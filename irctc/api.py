@@ -29,6 +29,7 @@ class API:
         self.session = ISession(
             bearer_token, csrf_token, uid, debug=debug, timeout=timeout, cookies=cookies)
         self._default_headers = "auth.csrf.uid.ctype"
+        self.request_locked = False
 
     def getAvlTrains(self, payload):
         resp = self._post("train.avlenq", json=payload)
@@ -75,8 +76,15 @@ class API:
         return resp
 
     def _post(self, route, url_args=None, data=None, json=None, params=None, headers=""):
-        url = self._makeurl(route, url_args=url_args)
-        return validateResponse(self.session.post(url, data=data, json=json, params=params, _headers=headers if headers else self._default_headers))
+        if not self.request_locked:
+            self.request_locked = True
+            url = self._makeurl(route, url_args=url_args)
+            resp = validateResponse(self.session.post(
+                url, data=data, json=json, params=params, _headers=headers if headers else self._default_headers))
+            self.request_locked = False
+            return resp
+        else:
+            logger.warning("existing request is running")
 
     def _makeurl(self, route, url_args=None):
         if url_args:
